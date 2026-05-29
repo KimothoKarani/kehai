@@ -31,3 +31,16 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Maven
+*.class
+
+# Environment — never commit secrets
+.env
+application-prod.yml
+application-local.yml
+src/main/resources/application.yaml
+
+# OS
+.DS_Store
+Thumbs.db
