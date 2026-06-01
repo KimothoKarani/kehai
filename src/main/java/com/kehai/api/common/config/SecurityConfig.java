@@ -14,6 +14,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 import javax.crypto.spec.SecretKeySpec;
 
@@ -58,7 +59,7 @@ public class SecurityConfig {
                 )
 
                 // Populate TenantContext after JWT is validated
-                .addFilterAfter(tenantContextFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterAfter(tenantContextFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
