@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Table(
@@ -66,6 +67,7 @@ public class FeatureVector {
     private Integer daysSinceLastLogin;
 
     // Total events in last 30 days
+    @JsonProperty("event_count_30d")
     @Column(name = "event_count_30d")
     private Integer eventCount30d;
 
