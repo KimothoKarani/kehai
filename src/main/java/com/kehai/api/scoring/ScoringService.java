@@ -8,10 +8,11 @@ import com.kehai.api.scoring.dto.RiskScoreResponse;
 import com.kehai.api.scoring.features.FeatureEngineeringService;
 import com.kehai.api.scoring.features.FeatureVector;
 import com.kehai.api.scoring.model.LogisticRegressionModel;
-import com.kehai.api.scoring.model.ModelCoefficients;
 import com.kehai.api.scoring.model.ModelPrediction;
 import com.kehai.api.tenant.Tenant;
 import com.kehai.api.tenant.TenantRepository;
+import com.kehai.api.narrative.NarrativeGenerator;
+import com.kehai.api.narrative.NarrativeResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class ScoringService {
     private final LogisticRegressionModel model;
     private final ChurnRiskScoreRepository scoreRepository;
     private final ScoringProperties properties;
+    private final NarrativeGenerator narrativeGenerator;
 
 
     public ScoringService(TenantRepository tenantRepository,
@@ -41,19 +43,21 @@ public class ScoringService {
                           FeatureEngineeringService featureService,
                           LogisticRegressionModel model,
                           ChurnRiskScoreRepository scoreRepository,
-                          ScoringProperties properties) {
+                          ScoringProperties properties, NarrativeGenerator narrativeGenerator) {
         this.tenantRepository = tenantRepository;
         this.customerRepository = customerRepository;
         this.featureService = featureService;
         this.model = model;
         this.scoreRepository = scoreRepository;
         this.properties = properties;
+        this.narrativeGenerator = narrativeGenerator;
     }
 
     @Transactional
     public RiskScoreResponse scoreCustomer(String externalId) {
         FeatureVector vector = featureService.computeFor(externalId);
         ModelPrediction prediction = model.predict(vector);
+        NarrativeResult narrative = narrativeGenerator.generate(prediction.score(), vector);
 
         ChurnRiskScore score = new ChurnRiskScore();
         score.setTenant(vector.getTenant());
@@ -62,8 +66,8 @@ public class ScoringService {
                 .setScale(4, RoundingMode.HALF_UP));
         score.setTimeHorizonDays(properties.getTimeHorizonDays());
         score.setRiskTier(toRiskTier(prediction.score()));
-        score.setNarrative(buildPlaceholderNarrative(prediction));
-        score.setRecommendedAction(null); // narrative engine fills this next phase
+        score.setNarrative(narrative.narrative());
+        score.setRecommendedAction(narrative.recommendedAction());
         score.setScoredAt(Instant.now());
         score.setModelVersion(prediction.modelVersion());
 
@@ -97,18 +101,18 @@ public class ScoringService {
     }
 
 
-    private String buildPlaceholderNarrative(ModelPrediction prediction) {
-        int pct = (int) Math.round(prediction.score() * 100);
-        String topSignal = prediction.contributions().entrySet().stream()
-                .max(Comparator.comparingDouble(e -> Math.abs(e.getValue())))
-                .map(Map.Entry::getKey)
-                .orElse("none");
-        return String.format(
-                "Churn probability: %d%% over %d days. Strongest signal: %s. "
-                + "Detailed narrative pending narrative engine integration.",
-                pct, properties.getTimeHorizonDays(), topSignal
-        );
-    }
+//    private String buildPlaceholderNarrative(ModelPrediction prediction) {
+//        int pct = (int) Math.round(prediction.score() * 100);
+//        String topSignal = prediction.contributions().entrySet().stream()
+//                .max(Comparator.comparingDouble(e -> Math.abs(e.getValue())))
+//                .map(Map.Entry::getKey)
+//                .orElse("none");
+//        return String.format(
+//                "Churn probability: %d%% over %d days. Strongest signal: %s. "
+//                + "Detailed narrative pending narrative engine integration.",
+//                pct, properties.getTimeHorizonDays(), topSignal
+//        );
+//    }
 
     private ChurnRiskScore.RiskTier toRiskTier(double score) {
         double high = properties.getRiskThresholds().getHigh();
