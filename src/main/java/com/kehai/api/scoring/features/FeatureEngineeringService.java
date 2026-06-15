@@ -48,13 +48,21 @@ public class FeatureEngineeringService {
                 computers.stream().map(c -> c.getClass().getSimpleName()).toList());
     }
 
+    /** HTTP-facing: resolves tenant from TenantCOntext, looks up customer */
     @Transactional
     public FeatureVector computeFor(String externalCustomerId) {
         Tenant tenant = currentTenant();
         Customer customer = customerRepository
                 .findByTenantAndExternalId(tenant, externalCustomerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Customer", externalCustomerId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer", externalCustomerId
+                ));
+        return computeFor(customer);
+    }
 
+    /** Internal/batch-facing: works directly from a Customer entity. */
+    @Transactional
+    public FeatureVector computeFor(Customer customer) {
         Instant now = Instant.now();
         Instant since = now.minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
@@ -62,20 +70,19 @@ public class FeatureEngineeringService {
                 .findByCustomerAndOccurredAtAfterOrderByOccurredAtDesc(customer, since);
 
         FeatureVector vector = new FeatureVector();
-        vector.setTenant(tenant);
+        vector.setTenant(customer.getTenant());
         vector.setCustomer(customer);
         vector.setComputedAt(now);
 
-        // Each computer mutates the vector with its contribution
         for (FeatureComputer computer : computers) {
             computer.compute(vector, events, now);
         }
 
         FeatureVector saved = vectorRepository.save(vector);
 
-        log.info("Computed feature vector {} for customer={} tenant={} ({} events analyzed)",
-                saved.getId(), externalCustomerId, tenant.getSlug(), events.size());
-
+        log.debug("Computed vector {} for customer={} tenant={} ({} events analyzed)",
+                saved.getId(), customer.getExternalId(),
+                customer.getTenant().getSlug(), events.size());
         return saved;
     }
 
