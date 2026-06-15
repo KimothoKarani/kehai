@@ -21,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.Comparator;
-import java.util.Map;
 
 @Service
 public class ScoringService {
@@ -53,17 +51,32 @@ public class ScoringService {
         this.narrativeGenerator = narrativeGenerator;
     }
 
+    /** HTTP-facing: resolves customer from externalId, returns full response DTO. */
     @Transactional
     public RiskScoreResponse scoreCustomer(String externalId) {
-        FeatureVector vector = featureService.computeFor(externalId);
+        Tenant tenant = currentTenant();
+        Customer customer = customerRepository
+                .findByTenantAndExternalId(tenant, externalId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Customer", externalId
+                ));
+
+        ScoringResult result = scoreCustomer(customer);
+        return RiskScoreResponse.from(result.score(), result.prediction().contributions());
+    }
+
+    /** Internal/batch-facing: scores a Customer directly. Returns saved entity + prediction. */
+    @Transactional
+    public ScoringResult scoreCustomer(Customer customer) {
+        FeatureVector vector = featureService.computeFor(customer);
         ModelPrediction prediction = model.predict(vector);
+
         NarrativeResult narrative = narrativeGenerator.generate(prediction.score(), vector);
 
         ChurnRiskScore score = new ChurnRiskScore();
-        score.setTenant(vector.getTenant());
-        score.setCustomer(vector.getCustomer());
-        score.setScore(BigDecimal.valueOf(prediction.score())
-                .setScale(4, RoundingMode.HALF_UP));
+        score.setTenant(customer.getTenant());
+        score.setCustomer(customer);
+        score.setScore(BigDecimal.valueOf(prediction.score()).setScale(4, RoundingMode.HALF_UP));
         score.setTimeHorizonDays(properties.getTimeHorizonDays());
         score.setRiskTier(toRiskTier(prediction.score()));
         score.setNarrative(narrative.narrative());
@@ -73,11 +86,12 @@ public class ScoringService {
 
         ChurnRiskScore saved = scoreRepository.save(score);
 
-        log.info("Scored customer={} score={} tier={} model={}",
-                externalId, saved.getScore(), saved.getRiskTier(),
-                saved.getModelVersion());
+        log.debug("Scored customer={} tenant={} score={} tier={}",
+                customer.getExternalId(), customer.getTenant().getSlug(),
+                saved.getScore(), saved.getRiskTier());
 
-        return RiskScoreResponse.from(saved, prediction.contributions());
+        return new ScoringResult(saved, prediction);
+
     }
 
     @Transactional(readOnly = true)
@@ -100,19 +114,6 @@ public class ScoringService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tenant", slug));
     }
 
-
-//    private String buildPlaceholderNarrative(ModelPrediction prediction) {
-//        int pct = (int) Math.round(prediction.score() * 100);
-//        String topSignal = prediction.contributions().entrySet().stream()
-//                .max(Comparator.comparingDouble(e -> Math.abs(e.getValue())))
-//                .map(Map.Entry::getKey)
-//                .orElse("none");
-//        return String.format(
-//                "Churn probability: %d%% over %d days. Strongest signal: %s. "
-//                + "Detailed narrative pending narrative engine integration.",
-//                pct, properties.getTimeHorizonDays(), topSignal
-//        );
-//    }
 
     private ChurnRiskScore.RiskTier toRiskTier(double score) {
         double high = properties.getRiskThresholds().getHigh();
