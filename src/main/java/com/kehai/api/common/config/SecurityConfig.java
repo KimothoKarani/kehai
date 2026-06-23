@@ -49,6 +49,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Health check - public so load balancers can reach it
                         .requestMatchers("/actuator/health").permitAll()
+                        // Public: API documentation
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         // Everything else requires a valid JWT
                         .anyRequest().authenticated()
                 )

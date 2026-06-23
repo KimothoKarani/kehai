@@ -1,6 +1,8 @@
 package com.kehai.api.batch;
 
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
@@ -18,6 +20,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Instant;
 import java.util.Map;
 
+@Tag(
+        name = "Administration",
+        description = "Operational endpoints for triggering and inspecting batch jobs. Restricted to " +
+                "users with the ROLE_ADMIN authority."
+)
 @RestController
 @RequestMapping("/admin/jobs")
 public class BatchAdminController {
@@ -32,6 +39,13 @@ public class BatchAdminController {
         this.nightlyScoringJob = nightlyScoringJob;
     }
 
+    @Operation(
+            summary = "Manually trigger the nightly scoring job",
+            description = "Launches the same Spring Batch job that runs automatically at 02:00 UTC. " +
+                    "Useful for re-running after an upstream data fix, or for testing in development. " +
+                    "Returns immediately with the JobExecution ID; check application logs or the " +
+                    "BATCH_JOB_EXECUTION table for completion status."
+    )
     @PostMapping("/nightly-scoring/run")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> runNightlyScoring() throws Exception {
