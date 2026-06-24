@@ -37,8 +37,9 @@ build/
 
 # Environment — never commit secrets
 .env
-application-prod.yml
-application-local.yml
+.env.local
+application-prod.yaml
+application-local.yaml
 src/main/resources/application.yaml
 
 # OS

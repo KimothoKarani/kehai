@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    # Render and Railway both inject a DATABASE_URL environment variable
+    # in JDBC format. Heroku injects JDBC_DATABASE_URL instead.
+    # If you switch to Heroku later, change DATABASE_URL to JDBC_DATABASE_URL below.
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+    hikari:
+      # Smaller pool for production to respect database connection limits
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  jpa:
+    # No SQL logging in production. It is noisy and leaks query patterns.
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # JWT secret must come from an environment variable in production.
+          # No default fallback. If the env var is missing, the app refuses to start.
+          # This is correct behavior: a missing secret is a fatal misconfiguration.
+          secret: ${JWT_SECRET}
+
+  logging:
+    level:
+      # Quieter logs in production: WARN level for Spring framework noise,
+      # INFO for our own code so business events stay visible.
+      org.springframework: WARN
+      org.hibernate: WARN
+      com.kehai.api: INFO
+      # Quartz is chatty by default
+      org.quartz: WARN
