@@ -36,3 +36,8 @@ spring:
       com.kehai.api: INFO
       # Quartz is chatty by default
       org.quartz: WARN
+
+kehai:
+  batch:
+    nightly-scoring:
+      cron: "0 0 2 * * ?"
