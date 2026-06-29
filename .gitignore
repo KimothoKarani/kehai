@@ -38,9 +38,9 @@ build/
 # Environment — never commit secrets
 .env
 .env.local
-application-prod.yaml
-application-local.yaml
-src/main/resources/application.yaml
+
+# Local-only override files — never commit
+src/main/resources/application-local.yaml
 
 # OS
 .DS_Store
