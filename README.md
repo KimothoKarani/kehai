@@ -312,7 +312,3 @@ If you are a B2B SaaS founder or a customer success leader interested in being o
 Proprietary. All rights reserved.
 
 ---
-
-## Contact
-
-Built by Kimotho Karani in Nairobi.
